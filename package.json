@@ -1,0 +1,44 @@
+{
+  "name": "pi-agent-supervisor",
+  "version": "1.0.0",
+  "description": "Runtime safety net for AI agents — blocks dangerous commands, protects files, enforces rate limits, and records sessions.",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "governance",
+    "safety",
+    "supervisor",
+    "rate-limiting",
+    "audit-log"
+  ],
+  "author": "nandal <nandal@users.noreply.github.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nandal/pi-ext",
+    "directory": "supervisor"
+  },
+  "homepage": "https://github.com/nandal/pi-ext/tree/main/supervisor",
+  "bugs": {
+    "url": "https://github.com/nandal/pi-ext/issues"
+  },
+  "license": "MIT",
+  "main": "./src/index.ts",
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "src/",
+    "README.md",
+    "AGENTS.md",
+    "LICENSE"
+  ],
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "typebox": "*"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  }
+}
