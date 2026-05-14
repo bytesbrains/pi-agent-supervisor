@@ -1,0 +1,7 @@
+# Process injection & manipulation
+LD_PRELOAD=
+gdb\s+-p
+strace\s+-p
+kill\s+-9\s+1\b
+kill\s+-SIGKILL\s+1\b
+echo\s+.*>\s+/proc/sys/kernel/core_pattern

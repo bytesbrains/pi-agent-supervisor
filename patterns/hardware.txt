@@ -1,0 +1,8 @@
+# Firmware & hardware destruction
+flashrom
+nvme\s+format
+hdparm\s+.*--security-erase
+hdparm\s+.*--security-set-pass
+sg_format
+ipmitool
+efibootmgr

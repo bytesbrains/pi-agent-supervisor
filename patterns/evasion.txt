@@ -1,0 +1,10 @@
+# Evidence tampering & log wiping
+history\s+-c
+history\s+-d
+rm\s+-f\s+/var/log/
+>\s*/var/log/syslog
+shred\s+-u
+journalctl\s+.*--vacuum-time=1s
+auditctl\s+-e\s+0
+auditctl\s+-D
+logrotate\s+-f

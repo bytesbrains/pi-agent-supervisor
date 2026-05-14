@@ -1,0 +1,9 @@
+# Container & runtime escape
+docker\s+run\s+.*--privileged
+docker\s+run\s+.*--pid=host
+docker\s+run\s+.*--network=host
+docker\s+run\s+.*-v\s+/:/host
+nsenter\s
+mount\s+/dev/sd
+capsh\s+--print
+systemd-nspawn

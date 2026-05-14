@@ -1,0 +1,14 @@
+# Persistence & backdoors
+crontab\s+-e
+crontab\s+-l\s*\|
+\*\s+\*\s+\*\s+\*\s+\*
+systemctl\s+enable\s+--now
+>.*~?/\.bashrc
+>.*~?/\.bash_profile
+>.*~?/\.zshrc
+>.*~?/\.ssh/authorized_keys
+ssh-keygen
+chattr\s+\+i
+setfacl
+at\s+now
+batch\s

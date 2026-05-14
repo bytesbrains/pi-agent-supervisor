@@ -47,22 +47,7 @@ interface SupervisorConfig {
 }
 
 const DEFAULT_CONFIG: SupervisorConfig = {
-  blockedPatterns: [
-    "rm\\s+-rf\\s+/\\s",
-    "rm\\s+-rf\\s+/$",
-    "rm\\s+-rf\\s+~",
-    "rm\\s+-rf\\s+\\*",
-    "git\\s+push\\s+.*--force",
-    "git\\s+push\\s+.*-f\\b",
-    "sudo\\s+",
-    "chmod\\s+777",
-    ">\\s*/dev/sd[a-z]",
-    "dd\\s+if=",
-    "mkfs\\.",
-    ":(){ :|:& };:", // fork bomb
-    ">\\s*\\.env",
-    ">\\s*\\.git",
-  ],
+  blockedPatterns: [], // Loaded from patterns/ directory at runtime
   protectedFiles: [
     ".env",
     ".env.local",
@@ -89,11 +74,42 @@ const DEFAULT_CONFIG: SupervisorConfig = {
   blockAtCriticalContext: false,
 };
 
+// ── Pattern loading from files ──
+
+function loadBlockedPatterns(extensionDir: string): string[] {
+  const patternsDir = path.join(extensionDir, "patterns");
+  if (!fs.existsSync(patternsDir)) return [];
+
+  const patterns: string[] = [];
+  try {
+    const files = fs.readdirSync(patternsDir).filter(f => f.endsWith(".txt"));
+    for (const file of files) {
+      const content = fs.readFileSync(path.join(patternsDir, file), "utf-8");
+      for (const line of content.split("\n")) {
+        const trimmed = line.trim();
+        // Skip comments and empty lines
+        if (!trimmed || trimmed.startsWith("#")) continue;
+        patterns.push(trimmed);
+      }
+    }
+  } catch {
+    // If pattern dir can't be read, return empty
+  }
+  return patterns;
+}
+
 // ── Config ──
 
-function loadConfig(cwd: string): SupervisorConfig {
+function loadConfig(cwd: string, extensionDir?: string): SupervisorConfig {
   const configPath = path.join(cwd, ".supervisorrc.yml");
-  if (!fs.existsSync(configPath)) return { ...DEFAULT_CONFIG };
+  const config = { ...DEFAULT_CONFIG };
+
+  // Load blocked patterns from pattern files
+  if (extensionDir) {
+    config.blockedPatterns = loadBlockedPatterns(extensionDir);
+  }
+
+  if (!fs.existsSync(configPath)) return config;
   try {
     const content = fs.readFileSync(configPath, "utf-8");
     const result: Record<string, unknown> = {};
@@ -111,7 +127,7 @@ function loadConfig(cwd: string): SupervisorConfig {
     return {
       blockedPatterns: result["blockedPatterns"]
         ? (result["blockedPatterns"] as string).split(",").map(s => s.trim()).filter(Boolean)
-        : DEFAULT_CONFIG.blockedPatterns,
+        : config.blockedPatterns,
       protectedFiles: result["protectedFiles"]
         ? (result["protectedFiles"] as string).split(",").map(s => s.trim()).filter(Boolean)
         : DEFAULT_CONFIG.protectedFiles,
@@ -238,11 +254,16 @@ function detectFileWrite(cmd: string): string | null {
 // ── Extension ──
 
 export default function (pi: ExtensionAPI) {
+  // Compute extension directory for pattern loading
+  const extensionDir = path.dirname(__filename || path.join(import.meta.dirname || __dirname, ".."));
+
+  // Helper to load config with extensionDir
+  const loadCfg = (cwd: string) => loadConfig(cwd, extensionDir);
   // ═══════════════════════════════════════
   // Runtime monitoring — intercept ALL tool calls
   // ═══════════════════════════════════════
   pi.on("tool_call", async (event, ctx) => {
-    const config = loadConfig(ctx.cwd);
+    const config = loadCfg(ctx.cwd);
     const now = Date.now();
 
     // Track call for rate limiting
@@ -307,7 +328,7 @@ export default function (pi: ExtensionAPI) {
 
   // ── Error tracking ──
   pi.on("tool_error", async (event, ctx) => {
-    const config = loadConfig(ctx.cwd);
+    const config = loadCfg(ctx.cwd);
     state.errorCount++;
     state.consecutiveErrors++;
 
@@ -337,7 +358,7 @@ export default function (pi: ExtensionAPI) {
     description: "Show supervisor session stats — rate, errors, blocked calls, context budget.",
     parameters: Type.Object({}),
     async execute(_toolCallId, _params, _signal, _onUpdate, ctx) {
-      const config = loadConfig(ctx.cwd);
+      const config = loadCfg(ctx.cwd);
       const rate = getCurrentRate(config);
 
       const lines: string[] = [];
@@ -380,7 +401,7 @@ export default function (pi: ExtensionAPI) {
       tail: Type.Optional(Type.Number({ description: "Number of recent lines to show (default: 50)" })),
     }),
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-      const config = loadConfig(ctx.cwd);
+      const config = loadCfg(ctx.cwd);
       const logPath = getAuditLogPath(ctx.cwd, config);
       const tail = params.tail || 50;
 
@@ -430,7 +451,7 @@ export default function (pi: ExtensionAPI) {
       command: Type.Optional(Type.String({ description: "The specific command that was blocked (if applicable)" })),
     }),
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-      const config = loadConfig(ctx.cwd);
+      const config = loadCfg(ctx.cwd);
 
       const cmdInfo = params.command ? `\n\nBlocked command: ${params.command}` : "";
       const msg = `Override requested${cmdInfo}\n\nReason: ${params.reason}\n\nAllow this operation?`;
@@ -462,7 +483,7 @@ export default function (pi: ExtensionAPI) {
   // Session lifecycle
   // ═══════════════════════════════════════
   pi.on("session_start", async (_event, ctx) => {
-    const config = loadConfig(ctx.cwd);
+    const config = loadCfg(ctx.cwd);
     appendToAuditLog(ctx.cwd, config, `SESSION_START host=${os.hostname()} cwd=${ctx.cwd}`);
 
     // Reset state for new session
@@ -477,7 +498,7 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("session_shutdown", async (_event, ctx) => {
-    const config = loadConfig(ctx.cwd);
+    const config = loadCfg(ctx.cwd);
     appendToAuditLog(ctx.cwd, config,
       `SESSION_END calls=${state.toolCalls.length} errors=${state.errorCount} blocked=${state.blockedCount}`,
     );

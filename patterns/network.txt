@@ -1,0 +1,12 @@
+# Network exfiltration & reverse shells
+curl\s+.*-F\s+'?file=@
+wget\s+.*--post-file=
+nc\s+-e\s+/bin
+ncat\s+.*--sh-exec
+python3?\s+-m\s+http\.server
+ssh\s+-R\s
+autossh\s+-R\s
+scp\s+.*@.*:
+rsync\s+.*@.*:
+dig\s+\+short\s+myip\.opendns\.com
+curl\s+ifconfig\.me

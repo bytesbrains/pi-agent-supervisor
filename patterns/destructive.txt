@@ -1,0 +1,15 @@
+# Destructive commands
+rm\s+-rf\s+/\s
+rm\s+-rf\s+/$
+rm\s+-rf\s+~
+rm\s+-rf\s+\*
+git\s+push\s+.*--force
+git\s+push\s+.*-f\b
+sudo\s+
+chmod\s+777
+>\s*/dev/sd[a-z]
+dd\s+if=
+mkfs\.
+:(){ :|:& };:
+>\s*\.env
+>\s*\.git

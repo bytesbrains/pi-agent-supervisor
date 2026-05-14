@@ -1,0 +1,10 @@
+# Cryptomining & resource abuse
+xmrig
+minerd
+cpuminer
+stratum
+nice\s+-n\s+-20
+chrt\s+-f\s+99
+stress-ng
+yes\s+>\s+/dev/null
+systemd-run\s+--scope\s+--property=CPUQuota

@@ -1,0 +1,7 @@
+# Supply chain — pipe-to-shell & untrusted installs
+curl\s+.*\|\s*bash
+curl\s+.*\|\s*sh
+wget\s+.*-qO-.*\|\s*bash
+wget\s+.*-qO-.*\|\s*sh
+pip\s+install\s+.*--index-url
+npm\s+install\s+.*--registry\s+http

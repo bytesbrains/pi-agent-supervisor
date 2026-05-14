@@ -28,6 +28,7 @@
   },
   "files": [
     "src/",
+    "patterns/",
     "README.md",
     "AGENTS.md",
     "LICENSE"
