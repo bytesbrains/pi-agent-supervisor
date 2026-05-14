@@ -226,7 +226,7 @@ function isProtectedFile(filePath: string, config: SupervisorConfig): boolean {
 
 function detectFileWrite(cmd: string): string | null {
   // Detect patterns like: > file, write to file, edit file, cat > file
-  const redirectMatch = cmd.match(/>\s*(\S+)/);
+  const redirectMatch = cmd.match(/>>?\s*(\S+)/);
   if (redirectMatch) return redirectMatch[1];
 
   const writeMatch = cmd.match(/(?:write|edit)\s+["']?([^\s"']+)["']?/i);

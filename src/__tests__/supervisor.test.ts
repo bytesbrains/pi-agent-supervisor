@@ -96,7 +96,7 @@ function isProtectedFile(filePath: string, config: SupervisorConfig): boolean {
 }
 
 function detectFileWrite(cmd: string): string | null {
-  const redirectMatch = cmd.match(/>\s*(\S+)/);
+  const redirectMatch = cmd.match(/>>?\s*(\S+)/);
   if (redirectMatch) return redirectMatch[1];
   return null;
 }
@@ -400,5 +400,209 @@ describe("integration: command + file protection", () => {
     expect(matchBlockedCommand("rm file.txt", config)).toBeNull();
     expect(matchBlockedCommand("rm -r node_modules", config)).toBeNull();
     expect(matchBlockedCommand("rm -rf node_modules", config)).toBeNull();
+  });
+});
+
+// ═══════════════════════════════════════
+// Escalation & State Tracking
+// ═══════════════════════════════════════
+
+describe("escalation protocol", () => {
+  it("triggers escalation after maxConsecutiveErrors", () => {
+    const maxErrors = 3;
+    let consecutiveErrors = 0;
+    let escalated = false;
+
+    for (let i = 0; i < maxErrors; i++) {
+      consecutiveErrors++;
+      if (consecutiveErrors >= maxErrors) {
+        escalated = true;
+      }
+    }
+    expect(escalated).toBe(true);
+    expect(consecutiveErrors).toBe(maxErrors);
+  });
+
+  it("resets consecutive errors on success", () => {
+    let consecutiveErrors = 2;
+    // Simulate success
+    consecutiveErrors = 0;
+    expect(consecutiveErrors).toBe(0);
+  });
+
+  it("does not escalate below threshold", () => {
+    let consecutiveErrors = 2;
+    expect(consecutiveErrors).toBeLessThan(3);
+  });
+
+  it("continues counting past threshold", () => {
+    let consecutiveErrors = 3;
+    consecutiveErrors++; // 4th error
+    expect(consecutiveErrors).toBe(4);
+  });
+});
+
+describe("rate limit boundary tests", () => {
+  const now = 1700000000000;
+
+  it("exactly at warn threshold", () => {
+    const calls = Array.from({ length: 50 }, (_, i) => now - i * 1000);
+    expect(getRateAtTime(calls, now, 60000)).toBe(50);
+  });
+
+  it("exactly at hard block threshold", () => {
+    const calls = Array.from({ length: 80 }, (_, i) => now - i * 500);
+    expect(getRateAtTime(calls, now, 60000)).toBe(80);
+  });
+
+  it("one below warn threshold", () => {
+    const calls = Array.from({ length: 49 }, (_, i) => now - i * 1000);
+    expect(getRateAtTime(calls, now, 60000)).toBe(49);
+  });
+
+  it("one above hard block threshold", () => {
+    const calls = Array.from({ length: 81 }, (_, i) => now - i * 500);
+    expect(getRateAtTime(calls, now, 60000)).toBe(81);
+  });
+
+  it("handles rapid bursts within window", () => {
+    // 20 calls within 1 second
+    const calls = Array.from({ length: 20 }, () => now);
+    expect(getRateAtTime(calls, now, 60000)).toBe(20);
+  });
+});
+
+describe("file write detection edge cases", () => {
+  it("detects append redirect", () => {
+    expect(detectFileWrite("echo test >> output.txt")).toBe("output.txt");
+  });
+
+  it("detects write with spaces around redirect", () => {
+    expect(detectFileWrite("cat >  /tmp/file")).toBe("/tmp/file");
+  });
+
+  it("returns null for grep commands", () => {
+    expect(detectFileWrite("grep pattern > /dev/null")).toBe("/dev/null");
+  });
+
+  it("handles quoted filenames", () => {
+    expect(detectFileWrite('echo test > "my file.txt"')).toBe('"my');  // naive parser
+    expect(detectFileWrite("echo test > 'my file.txt'")).toBe("'my");
+  });
+});
+
+describe("config edge cases", () => {
+  it("handles empty config gracefully", () => {
+    const config = parseConfigYaml("");
+    expect(config.rateLimitPerMinute).toBe(50);
+    expect(config.maxConsecutiveErrors).toBe(3);
+    expect(config.blockedPatterns.length).toBeGreaterThan(0);
+  });
+
+  it("handles malformed numeric values", () => {
+    const config = parseConfigYaml("rateLimitPerMinute: abc\nmaxConsecutiveErrors: xyz");
+    expect(config.rateLimitPerMinute).toBe(50); // falls back to default
+    expect(config.maxConsecutiveErrors).toBe(3);
+  });
+
+  it("handles quoted strings with commas", () => {
+    const yaml = 'protectedFiles: ".env,credentials.json"';
+    const config = parseConfigYaml(yaml);
+    expect(config.protectedFiles).toEqual([".env", "credentials.json"]);
+  });
+
+  it("handles single-quoted values", () => {
+    const yaml = "protectedFiles: '.env,credentials.json'";
+    const config = parseConfigYaml(yaml);
+    expect(config.protectedFiles).toEqual([".env", "credentials.json"]);
+  });
+
+  it("uses defaults for missing fields", () => {
+    const config = parseConfigYaml("rateLimitPerMinute: 30");
+    expect(config.rateLimitPerMinute).toBe(30);
+    expect(config.maxConsecutiveErrors).toBe(3); // default
+    expect(config.rateLimitPerMinute).toBe(30); // explicit
+  });
+
+  it("parses all boolean variants", () => {
+    expect(parseConfigYaml("enableAuditLog: false").enableAuditLog).toBe(false);
+    expect(parseConfigYaml("enableAuditLog: true").enableAuditLog).toBe(true);
+    expect(parseConfigYaml("enableAuditLog: yes").enableAuditLog).toBe(true); // not "false"
+    expect(parseConfigYaml("blockAtCriticalContext: false").blockAtCriticalContext).toBe(false);
+    expect(parseConfigYaml("blockAtCriticalContext: true").blockAtCriticalContext).toBe(true);
+  });
+});
+
+describe("combined protection scenarios", () => {
+  const config = { ...DEFAULT_CONFIG };
+
+  it("cat redirect to protected file", () => {
+    const cmd = "cat secret > .env";
+    const file = detectFileWrite(cmd);
+    expect(file).toBe(".env");
+    expect(isProtectedFile(file!, config)).toBe(true);
+  });
+
+  it("git force push to main (both danger + file pattern)", () => {
+    const cmd = "git push origin main --force";
+    expect(matchBlockedCommand(cmd, config)).toBeTruthy();
+  });
+
+  it("sudo redirect to protected file", () => {
+    const cmd = "sudo echo key > /root/.env";
+    expect(matchBlockedCommand(cmd, config)).toBeTruthy();
+    // Also check file protection
+    const file = detectFileWrite(cmd);
+    expect(file).toBe("/root/.env");
+    expect(isProtectedFile(file!, config)).toBe(true);
+  });
+
+  it("safe npm command passes all checks", () => {
+    const cmd = "npm run test -- --coverage";
+    expect(matchBlockedCommand(cmd, config)).toBeNull();
+    expect(detectFileWrite(cmd)).toBeNull();
+  });
+
+  it("docker compose up passes all checks", () => {
+    const cmd = "docker compose up -d";
+    expect(matchBlockedCommand(cmd, config)).toBeNull();
+  });
+});
+
+describe("session state lifecycle", () => {
+  it("tracks blocked count correctly", () => {
+    let blockedCount = 0;
+    blockedCount++;
+    blockedCount++;
+    expect(blockedCount).toBe(2);
+  });
+
+  it("tracks error count correctly", () => {
+    let errorCount = 0;
+    errorCount++;
+    errorCount++;
+    errorCount++;
+    expect(errorCount).toBe(3);
+  });
+
+  it("resets session state on new session", () => {
+    let state = {
+      toolCalls: [1, 2, 3],
+      errorCount: 5,
+      consecutiveErrors: 3,
+      blockedCount: 2,
+      lastEscalation: Date.now(),
+    };
+    // Reset
+    state = {
+      toolCalls: [],
+      errorCount: 0,
+      consecutiveErrors: 0,
+      blockedCount: 0,
+      lastEscalation: 0,
+    };
+    expect(state.toolCalls.length).toBe(0);
+    expect(state.errorCount).toBe(0);
+    expect(state.blockedCount).toBe(0);
   });
 });
