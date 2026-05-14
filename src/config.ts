@@ -5,6 +5,8 @@ export interface SupervisorConfig {
   blockedPatterns: string[];
   protectedFiles: string[];
   protectedPatterns: string[];
+  restrictToWorkspace: boolean;
+  allowedPaths: string[];
   rateLimitPerMinute: number;
   rateLimitHardBlock: number;
   maxConsecutiveErrors: number;
@@ -19,6 +21,8 @@ export const DEFAULT_CONFIG: SupervisorConfig = {
   blockedPatterns: [],
   protectedFiles: [".env", ".env.local", ".env.production", "credentials.json", "serviceAccountKey.json", ".claude/settings.local.json", ".git/config"],
   protectedPatterns: ["*.pem", "*.key", "id_rsa*", "*secret*", "*credential*"],
+  restrictToWorkspace: true,
+  allowedPaths: ["/tmp"],
   rateLimitPerMinute: 50, rateLimitHardBlock: 80, maxConsecutiveErrors: 3,
   enableAuditLog: true, auditLogPath: ".supervisor/audit.log",
   contextWarnThreshold: 70, contextCriticalThreshold: 90, blockAtCriticalContext: false,
@@ -56,6 +60,8 @@ export function loadConfig(cwd: string, extensionDir?: string): SupervisorConfig
       blockedPatterns: result["blockedPatterns"] ? (result["blockedPatterns"] as string).split(",").map(s => s.trim()).filter(Boolean) : config.blockedPatterns,
       protectedFiles: result["protectedFiles"] ? (result["protectedFiles"] as string).split(",").map(s => s.trim()).filter(Boolean) : DEFAULT_CONFIG.protectedFiles,
       protectedPatterns: result["protectedPatterns"] ? (result["protectedPatterns"] as string).split(",").map(s => s.trim()).filter(Boolean) : DEFAULT_CONFIG.protectedPatterns,
+      restrictToWorkspace: result["restrictToWorkspace"] !== "false",
+      allowedPaths: result["allowedPaths"] ? (result["allowedPaths"] as string).split(",").map(s => s.trim()).filter(Boolean) : DEFAULT_CONFIG.allowedPaths,
       rateLimitPerMinute: parseInt(result["rateLimitPerMinute"] as string) || DEFAULT_CONFIG.rateLimitPerMinute,
       rateLimitHardBlock: parseInt(result["rateLimitHardBlock"] as string) || DEFAULT_CONFIG.rateLimitHardBlock,
       maxConsecutiveErrors: parseInt(result["maxConsecutiveErrors"] as string) || DEFAULT_CONFIG.maxConsecutiveErrors,

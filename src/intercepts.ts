@@ -1,6 +1,10 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { loadConfig } from "./config";
-import { getCurrentRate, matchBlockedCommand, isProtectedFile, detectFileWrite, appendToAuditLog } from "./helpers";
+import {
+  getCurrentRate, matchBlockedCommand, isProtectedFile,
+  detectFileWrite, detectBashWriteTargets, isOutsideWorkspace,
+  appendToAuditLog,
+} from "./helpers";
 import { state } from "./state";
 
 export async function interceptToolCall(event: any, ctx: ExtensionContext, extensionDir: string) {
@@ -39,15 +43,40 @@ export async function interceptToolCall(event: any, ctx: ExtensionContext, exten
       state.blockedCount++;
       return { block: true, reason: msg };
     }
+
+    // ── Workspace boundary: block bash writes outside cwd ──
+    if (config.restrictToWorkspace) {
+      const writeTargets = detectBashWriteTargets(cmd);
+      for (const target of writeTargets) {
+        if (isOutsideWorkspace(target, ctx.cwd, config.allowedPaths)) {
+          const msg = `⛔ Bash write outside workspace blocked: ${target}`;
+          ctx.ui.notify(msg, "error");
+          appendToAuditLog(ctx.cwd, config, `BLOCK workspace-boundary: ${target} (cmd: ${cmd.substring(0, 80)})`);
+          state.blockedCount++;
+          return { block: true, reason: `${msg}\n  Command: ${cmd.substring(0, 120)}\n  Workspace: ${ctx.cwd}\n  To allow: add path to allowedPaths in .supervisorrc.yml` };
+        }
+      }
+    }
   }
 
   if ((event.toolName === "write" || event.toolName === "edit") && event.input.path) {
-    if (isProtectedFile(event.input.path as string, config)) {
-      const msg = `⛔ Write to protected file blocked: ${event.input.path}`;
+    const filePath = event.input.path as string;
+
+    if (isProtectedFile(filePath, config)) {
+      const msg = `⛔ Write to protected file blocked: ${filePath}`;
       ctx.ui.notify(msg, "error");
-      appendToAuditLog(ctx.cwd, config, `BLOCK protected-file: ${event.input.path}`);
+      appendToAuditLog(ctx.cwd, config, `BLOCK protected-file: ${filePath}`);
       state.blockedCount++;
       return { block: true, reason: msg };
+    }
+
+    // ── Workspace boundary: block writes outside cwd ──
+    if (config.restrictToWorkspace && isOutsideWorkspace(filePath, ctx.cwd, config.allowedPaths)) {
+      const msg = `⛔ Write outside workspace blocked: ${filePath}`;
+      ctx.ui.notify(msg, "error");
+      appendToAuditLog(ctx.cwd, config, `BLOCK workspace-boundary: ${filePath}`);
+      state.blockedCount++;
+      return { block: true, reason: `${msg}\n  Workspace: ${ctx.cwd}\n  To write outside the workspace, add the path to allowedPaths in .supervisorrc.yml or use supervisor_override().` };
     }
   }
 }

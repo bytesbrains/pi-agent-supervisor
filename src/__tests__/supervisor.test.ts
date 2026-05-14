@@ -880,3 +880,116 @@ describe("pattern file loading", () => {
     expect(patterns).toEqual(["sudo\\s+", "rm\\s+-rf\\s+/"]);
   });
 });
+
+// ═══════════════════════════════════════
+// Workspace boundary gates
+// ═══════════════════════════════════════
+
+import { isOutsideWorkspace, detectBashWriteTargets } from "../helpers";
+
+describe("isOutsideWorkspace", () => {
+  const cwd = "/Users/dev/project";
+  const allowed = ["/tmp"];
+
+  it("allows writes within cwd", () => {
+    expect(isOutsideWorkspace("src/app.ts", cwd, allowed)).toBe(false);
+    expect(isOutsideWorkspace("./src/app.ts", cwd, allowed)).toBe(false);
+    expect(isOutsideWorkspace("factory/agents/repo.ts", cwd, allowed)).toBe(false);
+  });
+
+  it("allows writes to allowed paths", () => {
+    expect(isOutsideWorkspace("/tmp/build.log", cwd, allowed)).toBe(false);
+    expect(isOutsideWorkspace("/tmp/subdir/file.txt", cwd, allowed)).toBe(false);
+  });
+
+  it("blocks writes outside workspace", () => {
+    expect(isOutsideWorkspace("/etc/passwd", cwd, allowed)).toBe(true);
+    expect(isOutsideWorkspace("/root/.bashrc", cwd, allowed)).toBe(true);
+    expect(isOutsideWorkspace("/usr/local/bin/script", cwd, allowed)).toBe(true);
+  });
+
+  it("blocks ~ expanded paths", () => {
+    expect(isOutsideWorkspace("~/.ssh/id_rsa", cwd, allowed)).toBe(true);
+    expect(isOutsideWorkspace("~/.bashrc", cwd, allowed)).toBe(true);
+  });
+
+  it("blocks relative path traversal out of cwd", () => {
+    expect(isOutsideWorkspace("../../../etc/passwd", cwd, allowed)).toBe(true);
+    expect(isOutsideWorkspace("../other-project/file.ts", cwd, allowed)).toBe(true);
+  });
+
+  it("allows paths exactly matching cwd", () => {
+    expect(isOutsideWorkspace(cwd, cwd, allowed)).toBe(false);
+    expect(isOutsideWorkspace(".", cwd, allowed)).toBe(false);
+  });
+
+  it("blocks when restrictToWorkspace is disabled (caller handles toggle)", () => {
+    // The function itself always checks; the caller (intercepts) checks config.restrictToWorkspace
+    expect(isOutsideWorkspace("/etc/hosts", cwd, allowed)).toBe(true);
+  });
+});
+
+describe("detectBashWriteTargets", () => {
+  it("detects redirect writes", () => {
+    const targets = detectBashWriteTargets("echo hello > /etc/hosts");
+    expect(targets).toContain("/etc/hosts");
+  });
+
+  it("detects append redirects", () => {
+    const targets = detectBashWriteTargets("echo hello >> /var/log/app.log");
+    expect(targets).toContain("/var/log/app.log");
+  });
+
+  it("ignores /dev/null redirects", () => {
+    const targets = detectBashWriteTargets("npm test > /dev/null 2>&1");
+    expect(targets.filter(t => t === "/dev/null")).toHaveLength(0);
+  });
+
+  it("detects tee writes", () => {
+    const targets = detectBashWriteTargets("echo test | tee /etc/config /tmp/out");
+    expect(targets).toContain("/etc/config");
+    expect(targets).toContain("/tmp/out");
+  });
+
+  it("detects cp destination", () => {
+    const targets = detectBashWriteTargets("cp /tmp/src /etc/dest");
+    expect(targets).toContain("/etc/dest");
+  });
+
+  it("detects mv destination", () => {
+    const targets = detectBashWriteTargets("mv old /usr/local/new");
+    expect(targets).toContain("/usr/local/new");
+  });
+
+  it("detects dd of= target", () => {
+    const targets = detectBashWriteTargets("dd if=/dev/zero of=/dev/sda bs=1M");
+    expect(targets).toContain("/dev/sda");
+  });
+
+  it("detects mkdir targets", () => {
+    const targets = detectBashWriteTargets("mkdir -p /etc/cron.d/backdoor");
+    expect(targets).toContain("/etc/cron.d/backdoor");
+  });
+
+  it("detects touch targets", () => {
+    const targets = detectBashWriteTargets("touch /var/run/.hidden");
+    expect(targets).toContain("/var/run/.hidden");
+  });
+
+  it("detects ln -s destination", () => {
+    const targets = detectBashWriteTargets("ln -s /etc/passwd /tmp/link");
+    expect(targets).toContain("/tmp/link");
+  });
+
+  it("detects multiple redirects", () => {
+    const targets = detectBashWriteTargets("cmd > /etc/a 2> /var/b");
+    expect(targets).toContain("/etc/a");
+    expect(targets).toContain("/var/b");
+  });
+
+  it("returns empty for read-only commands", () => {
+    expect(detectBashWriteTargets("cat /etc/passwd")).toEqual([]);
+    expect(detectBashWriteTargets("ls -la")).toEqual([]);
+    expect(detectBashWriteTargets("grep pattern file.txt")).toEqual([]);
+  });
+});
