@@ -48,7 +48,8 @@ interface SupervisorConfig {
 
 const DEFAULT_CONFIG: SupervisorConfig = {
   blockedPatterns: [
-    "rm\\s+-rf\\s+/",
+    "rm\\s+-rf\\s+/\\s",
+    "rm\\s+-rf\\s+/$",
     "rm\\s+-rf\\s+~",
     "rm\\s+-rf\\s+\\*",
     "git\\s+push\\s+.*--force",
@@ -98,7 +99,14 @@ function loadConfig(cwd: string): SupervisorConfig {
     const result: Record<string, unknown> = {};
     for (const line of content.split("\n")) {
       const m = line.match(/^\s*([\w][\w.]*):\s*(.+)$/);
-      if (m) result[m[1]] = m[2].trim();
+      if (m) {
+        let val = m[2].trim();
+        // Strip surrounding quotes
+        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+          val = val.slice(1, -1);
+        }
+        result[m[1]] = val;
+      }
     }
     return {
       blockedPatterns: result["blockedPatterns"]
@@ -193,8 +201,8 @@ function matchBlockedCommand(cmd: string, config: SupervisorConfig): string | nu
 function isProtectedFile(filePath: string, config: SupervisorConfig): boolean {
   const basename = path.basename(filePath);
 
-  // Exact file match
-  if (config.protectedFiles.some(f => filePath.includes(f) || basename === f)) {
+  // Exact file match (basename equality, not substring)
+  if (config.protectedFiles.some(f => basename === f || filePath.endsWith(f))) {
     return true;
   }
 
