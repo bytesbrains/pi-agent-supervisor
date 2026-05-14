@@ -139,5 +139,23 @@ export function detectBashWriteTargets(cmd: string): string[] {
   const lnMatch = cmd.match(lnRe);
   if (lnMatch) targets.push(lnMatch[2].replace(/["']/g, ""));
 
+  // Indirect writes: busybox cp/mv/dd, node -e 'require("fs").writeFileSync(...)', python -c
+  const indirectRe = /\b(?:busybox\s+)?(?:cp|mv|dd|tee|touch|mkdir|ln)\s+(?:-[a-zA-Z]+\s+)*/g;
+  // Already handled above, but also check for:
+  // printf 'data' > file
+  const printfRe = /\bprintf\s+.*?>>?\s*(\S+)/;
+  const printfMatch = cmd.match(printfRe);
+  if (printfMatch) targets.push(printfMatch[1].replace(/["']/g, ""));
+
+  // node -e "require('fs').writeFileSync('path', ...)"
+  const nodeWriteRe = /\bnode\s+.*\b(?:writeFileSync|writeFile|appendFileSync|appendFile|createWriteStream)\s*\(\s*['"]([^'"]+)['"]/;
+  const nodeMatch = cmd.match(nodeWriteRe);
+  if (nodeMatch) targets.push(nodeMatch[1]);
+
+  // python -c "open('path','w')"
+  const pyWriteRe = /\bpython\d*(?:\.[0-9]+)?\s+.*\bopen\s*\(\s*['"]([^'"]+)['"]\s*,\s*['"][wa]['"]/;
+  const pyMatch = cmd.match(pyWriteRe);
+  if (pyMatch) targets.push(pyMatch[1]);
+
   return targets;
 }

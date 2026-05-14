@@ -1,6 +1,6 @@
 {
   "name": "pi-agent-supervisor",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Runtime safety net for AI agents \u2014 blocks dangerous commands, protects files, enforces rate limits, and records sessions.",
   "keywords": [
     "pi-package",
