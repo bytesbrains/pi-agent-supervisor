@@ -1,7 +1,7 @@
 # Agent Supervisor for Pi
 
-[![npm version](https://img.shields.io/npm/v/pi-agent-supervisor)](https://www.npmjs.com/package/pi-agent-supervisor)
-[![license](https://img.shields.io/npm/l/pi-agent-supervisor)](./LICENSE)
+[![npm version](https://img.shields.io/npm/v/@bytesbrains/pi-agent-supervisor)](https://www.npmjs.com/package/@bytesbrains/pi-agent-supervisor)
+[![license](https://img.shields.io/npm/l/@bytesbrains/pi-agent-supervisor)](./LICENSE)
 
 > Runtime safety net for AI agents — blocks dangerous commands, protects sensitive files, enforces rate limits, and records sessions to an append-only audit log.
 
@@ -12,7 +12,7 @@ The other three gates handle *what* agents do (contrib, review, project). The su
 ## Install
 
 ```bash
-pi install npm:pi-agent-supervisor
+pi install npm:@bytesbrains/pi-agent-supervisor
 ```
 
 ## Tools
@@ -106,10 +106,10 @@ Human confirmation required...
 Install all four gates for full agent governance:
 
 ```bash
-pi install npm:pi-contrib-gate
-pi install npm:pi-review-gate
-pi install npm:pi-project-gate
-pi install npm:pi-agent-supervisor
+pi install npm:@bytesbrains/pi-contrib-gate
+pi install npm:@bytesbrains/pi-review-gate
+pi install npm:@bytesbrains/pi-project-gate
+pi install npm:@bytesbrains/pi-agent-supervisor
 ```
 
 ## License
