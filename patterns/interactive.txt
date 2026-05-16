@@ -1,0 +1,52 @@
+# Interactive TUI programs that block forever waiting for keyboard input
+# Editors (use pi's built-in edit/write tools instead)
+\bvi\b
+\bvim\b
+\bnvim\b
+\bnano\b
+\bemacs\b(?!\s+--batch)
+\bmicro\b
+\bhelix\b
+\bkak\b
+\bne\b
+\bjoe\b
+\bmcedit\b
+
+# Pagers (use cat or redirects instead)
+\bless\b(?!\s+-FX)
+\bmore\b
+\bmost\b
+\bpg\b
+
+# System monitors
+\btop\b
+\bhtop\b
+\bbtop\b
+\batop\b
+\bglances\b
+\bnmon\b
+\biotop\b
+\biftop\b
+
+# Man pages (use --help or tldr instead)
+\bman\s+
+\binfo\s+
+
+# REPLs / shells
+\bpython3?\b(?!\s+\S)
+\bnode\b(?!\s+\S)
+\birb\b(?!\s+\S)
+\bghci\b(?!\s+\S)
+\bracket\b(?!\s+\S)
+\blua\b(?!\s+\S)
+\bscala\b(?!\s+\S)
+\bghci\b(?!\s+\S)
+
+# Network tools that wait indefinitely
+\bnc\s+-l
+\netcat\s+-l
+\bsocat\s+.*LISTEN
+
+# Watch / tail -f (infinite loops)
+\bwatch\s+
+\btail\s+-f\b

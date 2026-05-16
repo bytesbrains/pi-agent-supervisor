@@ -26,6 +26,12 @@ export async function interceptToolCall(event: any, ctx: ExtensionContext, exten
   }
 
   if (event.toolName === "bash" && typeof event.input.command === "string") {
+    // Force non-interactive mode: disable editors, pagers, and any TUI that would block
+    const ENV_PREFIX = "EDITOR=cat VISUAL=cat PAGER=cat GIT_PAGER=cat MANPAGER=cat SYSTEMD_PAGER= DEBIAN_FRONTEND=noninteractive ";
+    if (!event.input.command.startsWith(ENV_PREFIX)) {
+      event.input.command = ENV_PREFIX + event.input.command;
+    }
+
     const cmd = event.input.command;
     const blocked = matchBlockedCommand(cmd, config);
     if (blocked) {

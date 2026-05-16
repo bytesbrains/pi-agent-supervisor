@@ -49,14 +49,25 @@ export const logTool = {
 
 export const overrideTool = {
   name: "supervisor_override" as const, label: "Request Override",
-  description: "Request human override for a blocked operation.",
-  parameters: Type.Object({ reason: Type.String({}), command: Type.Optional(Type.String({})) }),
+  description: "Request human override for a blocked operation. Set preApproved=true when human already approved via Telegram (telegram_override).",
+  parameters: Type.Object({ reason: Type.String({}), command: Type.Optional(Type.String({})), preApproved: Type.Optional(Type.Boolean({})) }),
   async execute(_id: string, params: any, _s: any, _u: any, ctx: ExtensionContext) {
     const config = loadConfig(ctx.cwd);
-    const cmdInfo = params.command ? `\n\nBlocked command: ${params.command}` : "";
-    const allowed = await ctx.ui.confirm("Supervisor Override", `Override requested${cmdInfo}\n\nReason: ${params.reason}\n\nAllow?`);
+    let allowed: boolean;
+
+    if (params.preApproved) {
+      // Human already approved via Telegram — skip TUI prompt
+      allowed = true;
+      appendToAuditLog(ctx.cwd, config, `OVERRIDE pre-approved (telegram): ${params.reason}`);
+    } else {
+      const cmdInfo = params.command ? `\n\nBlocked command: ${params.command}` : "";
+      allowed = await ctx.ui.confirm("Supervisor Override", `Override requested${cmdInfo}\n\nReason: ${params.reason}\n\nAllow?`);
+    }
+
     if (allowed) {
-      appendToAuditLog(ctx.cwd, config, `OVERRIDE allowed: ${params.reason}`);
+      if (!params.preApproved) {
+        appendToAuditLog(ctx.cwd, config, `OVERRIDE allowed: ${params.reason}`);
+      }
       return { content: [{ type: "text", text: "✅ Override granted." }], details: { override: true } };
     }
     appendToAuditLog(ctx.cwd, config, `OVERRIDE denied: ${params.reason}`);
