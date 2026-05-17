@@ -56,19 +56,24 @@ export function loadConfig(cwd: string, extensionDir?: string): SupervisorConfig
       const m = line.match(/^\s*([\w][\w.]*):\s*(.+)$/);
       if (m) { let v = m[2].trim(); if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1); result[m[1]] = v; }
     }
+    const rateLimitPerMinute = parseInt(result["rateLimitPerMinute"] as string);
+    const rateLimitHardBlock = parseInt(result["rateLimitHardBlock"] as string);
+    const maxConsecutiveErrors = parseInt(result["maxConsecutiveErrors"] as string);
+    const contextWarnThreshold = parseInt(result["contextWarnThreshold"] as string);
+    const contextCriticalThreshold = parseInt(result["contextCriticalThreshold"] as string);
     return {
       blockedPatterns: result["blockedPatterns"] ? (result["blockedPatterns"] as string).split(",").map(s => s.trim()).filter(Boolean) : config.blockedPatterns,
       protectedFiles: result["protectedFiles"] ? (result["protectedFiles"] as string).split(",").map(s => s.trim()).filter(Boolean) : DEFAULT_CONFIG.protectedFiles,
       protectedPatterns: result["protectedPatterns"] ? (result["protectedPatterns"] as string).split(",").map(s => s.trim()).filter(Boolean) : DEFAULT_CONFIG.protectedPatterns,
       restrictToWorkspace: result["restrictToWorkspace"] !== "false",
       allowedPaths: result["allowedPaths"] ? (result["allowedPaths"] as string).split(",").map(s => s.trim()).filter(Boolean) : DEFAULT_CONFIG.allowedPaths,
-      rateLimitPerMinute: parseInt(result["rateLimitPerMinute"] as string) || DEFAULT_CONFIG.rateLimitPerMinute,
-      rateLimitHardBlock: parseInt(result["rateLimitHardBlock"] as string) || DEFAULT_CONFIG.rateLimitHardBlock,
-      maxConsecutiveErrors: parseInt(result["maxConsecutiveErrors"] as string) || DEFAULT_CONFIG.maxConsecutiveErrors,
+      rateLimitPerMinute: isNaN(rateLimitPerMinute) ? DEFAULT_CONFIG.rateLimitPerMinute : rateLimitPerMinute,
+      rateLimitHardBlock: isNaN(rateLimitHardBlock) ? DEFAULT_CONFIG.rateLimitHardBlock : rateLimitHardBlock,
+      maxConsecutiveErrors: isNaN(maxConsecutiveErrors) ? DEFAULT_CONFIG.maxConsecutiveErrors : maxConsecutiveErrors,
       enableAuditLog: result["enableAuditLog"] !== "false",
       auditLogPath: (result["auditLogPath"] as string) || DEFAULT_CONFIG.auditLogPath,
-      contextWarnThreshold: parseInt(result["contextWarnThreshold"] as string) || DEFAULT_CONFIG.contextWarnThreshold,
-      contextCriticalThreshold: parseInt(result["contextCriticalThreshold"] as string) || DEFAULT_CONFIG.contextCriticalThreshold,
+      contextWarnThreshold: isNaN(contextWarnThreshold) ? DEFAULT_CONFIG.contextWarnThreshold : contextWarnThreshold,
+      contextCriticalThreshold: isNaN(contextCriticalThreshold) ? DEFAULT_CONFIG.contextCriticalThreshold : contextCriticalThreshold,
       blockAtCriticalContext: result["blockAtCriticalContext"] === "true",
     };
   } catch { return config; }
